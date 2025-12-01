@@ -65,7 +65,7 @@ screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 -- ===== MAIN FRAME =====
 local mainFrame = Instance.new("Frame")
 mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 450, 0, 300)
+mainFrame.Size = UDim2.new(0, 480, 0, 300)
 mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
 mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
 mainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
@@ -108,7 +108,7 @@ local headerFrame = Instance.new("Frame")
 headerFrame.Name = "Header"
 headerFrame.Size = UDim2.new(1, 0, 0, 40)
 headerFrame.Position = UDim2.new(0, 0, 0, 0)
-headerFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 35)
+headerFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
 headerFrame.BorderSizePixel = 0
 headerFrame.Parent = mainFrame
 
@@ -119,7 +119,7 @@ headerCorner.Parent = headerFrame
 local headerBlock = Instance.new("Frame")
 headerBlock.Size = UDim2.new(1, 0, 0, 12)
 headerBlock.Position = UDim2.new(0, 0, 1, -12)
-headerBlock.BackgroundColor3 = Color3.fromRGB(22, 22, 35)
+headerBlock.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
 headerBlock.BorderSizePixel = 0
 headerBlock.Parent = headerFrame
 
@@ -130,7 +130,7 @@ headerGradient.Color = ColorSequence.new{
 }
 headerGradient.Rotation = 90
 headerGradient.Transparency = NumberSequence.new{
-    NumberSequenceKeypoint.new(0, 0.85),
+    NumberSequenceKeypoint.new(0, 0.92),
     NumberSequenceKeypoint.new(1, 1)
 }
 headerGradient.Parent = headerFrame
@@ -179,16 +179,31 @@ titleLabel.Parent = headerFrame
 -- ===== SIDEBAR =====
 local sidebar = Instance.new("Frame")
 sidebar.Name = "Sidebar"
-sidebar.Size = UDim2.new(0, 90, 1, -40)
+sidebar.Size = UDim2.new(0, 100, 1, -40)
 sidebar.Position = UDim2.new(0, 0, 0, 40)
-sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 32)
+sidebar.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+sidebar.BackgroundTransparency = 0.3
 sidebar.BorderSizePixel = 0
 sidebar.Parent = mainFrame
+
+-- Fix corner bleeding
+local sidebarCornerFix = Instance.new("Frame")
+sidebarCornerFix.Size = UDim2.new(0, 12, 0, 12)
+sidebarCornerFix.Position = UDim2.new(0, 0, 1, -12)
+sidebarCornerFix.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+sidebarCornerFix.BackgroundTransparency = 0.05
+sidebarCornerFix.BorderSizePixel = 0
+sidebarCornerFix.Parent = mainFrame
+
+local cornerFixCorner = Instance.new("UICorner")
+cornerFixCorner.CornerRadius = UDim.new(0, 12)
+cornerFixCorner.Parent = sidebarCornerFix
 
 local sidebarDivider = Instance.new("Frame")
 sidebarDivider.Size = UDim2.new(0, 1, 1, 0)
 sidebarDivider.Position = UDim2.new(1, 0, 0, 0)
 sidebarDivider.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+sidebarDivider.BackgroundTransparency = 0.5
 sidebarDivider.BorderSizePixel = 0
 sidebarDivider.Parent = sidebar
 
@@ -202,6 +217,7 @@ local function createTabButton(name, order)
     btn.Size = UDim2.new(1, -12, 0, 36)
     btn.Position = UDim2.new(0, 6, 0, 10 + (order * 42))
     btn.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+    btn.BackgroundTransparency = 0.3
     btn.BorderSizePixel = 0
     btn.AutoButtonColor = false
     btn.Text = ""
@@ -225,13 +241,15 @@ local function createTabButton(name, order)
     
     if name == "Main" then
         btn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+        btn.BackgroundTransparency = 0
         textLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
     end
     
     btn.MouseEnter:Connect(function()
         if currentTab ~= name then
             TweenService:Create(btn, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+                BackgroundColor3 = Color3.fromRGB(30, 30, 45),
+                BackgroundTransparency = 0
             }):Play()
         end
     end)
@@ -239,7 +257,8 @@ local function createTabButton(name, order)
     btn.MouseLeave:Connect(function()
         if currentTab ~= name then
             TweenService:Create(btn, TweenInfo.new(0.2), {
-                BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+                BackgroundColor3 = Color3.fromRGB(25, 25, 38),
+                BackgroundTransparency = 0.3
             }):Play()
         end
     end)
@@ -253,8 +272,8 @@ local settingsTabBtn = createTabButton("Settings", 1)
 -- ===== CONTENT AREA =====
 local contentArea = Instance.new("Frame")
 contentArea.Name = "ContentArea"
-contentArea.Size = UDim2.new(1, -102, 1, -52)
-contentArea.Position = UDim2.new(0, 96, 0, 46)
+contentArea.Size = UDim2.new(1, -112, 1, -52)
+contentArea.Position = UDim2.new(0, 106, 0, 46)
 contentArea.BackgroundTransparency = 1
 contentArea.ClipsDescendants = true
 contentArea.Parent = mainFrame
@@ -287,14 +306,16 @@ local function switchTab(tabName)
     for name, tab in pairs(tabButtons) do
         if name == tabName then
             TweenService:Create(tab.button, TweenInfo.new(0.3), {
-                BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+                BackgroundColor3 = Color3.fromRGB(35, 35, 50),
+                BackgroundTransparency = 0
             }):Play()
             TweenService:Create(tab.text, TweenInfo.new(0.3), {
                 TextColor3 = Color3.fromRGB(100, 255, 180)
             }):Play()
         else
             TweenService:Create(tab.button, TweenInfo.new(0.3), {
-                BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+                BackgroundColor3 = Color3.fromRGB(25, 25, 38),
+                BackgroundTransparency = 0.3
             }):Play()
             TweenService:Create(tab.text, TweenInfo.new(0.3), {
                 TextColor3 = Color3.fromRGB(180, 180, 200)
