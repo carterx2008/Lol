@@ -1,0 +1,1172 @@
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- ===== SAVE SYSTEM =====
+local SaveFileName = "PanelAutoControl_Settings.json"
+
+local function saveSettings(settings)
+    writefile(SaveFileName, game:GetService("HttpService"):JSONEncode(settings))
+end
+
+local function loadSettings()
+    if isfile(SaveFileName) then
+        local success, result = pcall(function()
+            return game:GetService("HttpService"):JSONDecode(readfile(SaveFileName))
+        end)
+        if success then
+            return result
+        end
+    end
+    return {
+        antiRejoinEnabled = false,
+        lastUsername = "",
+        autoActivate = false,
+        selectedMode = "user_social",
+        lastModeID = ""
+    }
+end
+
+local savedSettings = loadSettings()
+
+-- ===== MODE OPTIONS =====
+local modeOptions = {
+    {name = "User Social", value = "user_social", requireName = true, placeholder = "Username or User ID..."},
+    {name = "Community Project", value = "project_contribute", requireName = false, placeholder = "Group ID..."},
+    {name = "Supporting Asset", value = "content_asset_support", requireName = false, placeholder = "Asset ID..."},
+    {name = "Supporting Bundle", value = "content_bundle_support", requireName = false, placeholder = "Bundle ID..."},
+    {name = "Supporting Game", value = "game_favorite", requireName = false, placeholder = "Game ID..."}
+}
+
+local selectedModeIndex = 1
+for i, mode in ipairs(modeOptions) do
+    if mode.value == savedSettings.selectedMode then
+        selectedModeIndex = i
+        break
+    end
+end
+
+-- ===== CREATE GUI =====
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "PanelAutoControl"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+pcall(function()
+    if LocalPlayer:FindFirstChild("PlayerGui"):FindFirstChild("PanelAutoControl") then
+        LocalPlayer.PlayerGui.PanelAutoControl:Destroy()
+    end
+end)
+
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- ===== MAIN FRAME (WIDER RECTANGLE) =====
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 550, 0, 380)
+mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+mainFrame.BackgroundColor3 = Color3.fromRGB(18, 18, 28)
+mainFrame.BackgroundTransparency = 0.05
+mainFrame.BorderSizePixel = 0
+mainFrame.ClipsDescendants = true
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 12)
+mainCorner.Parent = mainFrame
+
+local borderStroke = Instance.new("UIStroke")
+borderStroke.Color = Color3.fromRGB(100, 255, 180)
+borderStroke.Thickness = 2
+borderStroke.Transparency = 0
+borderStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+borderStroke.Parent = mainFrame
+
+local borderGradient = Instance.new("UIGradient")
+borderGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(80, 220, 150)),
+    ColorSequenceKeypoint.new(0.5, Color3.fromRGB(90, 190, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 220, 150))
+}
+borderGradient.Rotation = 0
+borderGradient.Parent = borderStroke
+
+task.spawn(function()
+    local rotateBorder = TweenService:Create(
+        borderGradient,
+        TweenInfo.new(4, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1),
+        {Rotation = 360}
+    )
+    rotateBorder:Play()
+end)
+
+-- ===== HEADER =====
+local headerFrame = Instance.new("Frame")
+headerFrame.Name = "Header"
+headerFrame.Size = UDim2.new(1, 0, 0, 40)
+headerFrame.Position = UDim2.new(0, 0, 0, 0)
+headerFrame.BackgroundColor3 = Color3.fromRGB(22, 22, 35)
+headerFrame.BorderSizePixel = 0
+headerFrame.Parent = mainFrame
+
+local headerCorner = Instance.new("UICorner")
+headerCorner.CornerRadius = UDim.new(0, 12)
+headerCorner.Parent = headerFrame
+
+local headerBlock = Instance.new("Frame")
+headerBlock.Size = UDim2.new(1, 0, 0, 12)
+headerBlock.Position = UDim2.new(0, 0, 1, -12)
+headerBlock.BackgroundColor3 = Color3.fromRGB(22, 22, 35)
+headerBlock.BorderSizePixel = 0
+headerBlock.Parent = headerFrame
+
+local headerGradient = Instance.new("UIGradient")
+headerGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 255, 180)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 200, 255))
+}
+headerGradient.Rotation = 90
+headerGradient.Transparency = NumberSequence.new{
+    NumberSequenceKeypoint.new(0, 0.85),
+    NumberSequenceKeypoint.new(1, 1)
+}
+headerGradient.Parent = headerFrame
+
+-- ===== CLOSE BUTTON =====
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Size = UDim2.new(0, 30, 0, 30)
+closeButton.Position = UDim2.new(1, -38, 0, 5)
+closeButton.BackgroundTransparency = 1
+closeButton.Text = "✕"
+closeButton.TextSize = 18
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextColor3 = Color3.fromRGB(180, 180, 200)
+closeButton.BorderSizePixel = 0
+closeButton.AutoButtonColor = false
+closeButton.Parent = headerFrame
+
+closeButton.MouseEnter:Connect(function()
+    TweenService:Create(closeButton, TweenInfo.new(0.2), {
+        TextColor3 = Color3.fromRGB(255, 100, 120)
+    }):Play()
+end)
+
+closeButton.MouseLeave:Connect(function()
+    TweenService:Create(closeButton, TweenInfo.new(0.2), {
+        TextColor3 = Color3.fromRGB(180, 180, 200)
+    }):Play()
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+    local exitAnim = TweenService:Create(mainFrame, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0),
+        BackgroundTransparency = 1
+    })
+    
+    local exitBorder = TweenService:Create(borderStroke, TweenInfo.new(0.3), {
+        Transparency = 1
+    })
+    
+    exitAnim:Play()
+    exitBorder:Play()
+    
+    exitAnim.Completed:Connect(function()
+        screenGui:Destroy()
+    end)
+end)
+
+local titleLabel = Instance.new("TextLabel")
+titleLabel.Size = UDim2.new(1, -40, 1, 0)
+titleLabel.Position = UDim2.new(0, 15, 0, 0)
+titleLabel.BackgroundTransparency = 1
+titleLabel.Text = "Panel Auto Control"
+titleLabel.TextSize = 16
+titleLabel.Font = Enum.Font.GothamBold
+titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+titleLabel.TextXAlignment = Enum.TextXAlignment.Left
+titleLabel.Parent = headerFrame
+
+-- ===== SIDEBAR =====
+local sidebar = Instance.new("Frame")
+sidebar.Name = "Sidebar"
+sidebar.Size = UDim2.new(0, 140, 1, -40)
+sidebar.Position = UDim2.new(0, 0, 0, 40)
+sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 32)
+sidebar.BorderSizePixel = 0
+sidebar.Parent = mainFrame
+
+local sidebarDivider = Instance.new("Frame")
+sidebarDivider.Size = UDim2.new(0, 1, 1, 0)
+sidebarDivider.Position = UDim2.new(1, 0, 0, 0)
+sidebarDivider.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+sidebarDivider.BorderSizePixel = 0
+sidebarDivider.Parent = sidebar
+
+-- ===== TAB BUTTONS =====
+local tabButtons = {}
+local currentTab = "Main"
+
+local function createTabButton(name, icon, order)
+    local btn = Instance.new("TextButton")
+    btn.Name = name .. "Tab"
+    btn.Size = UDim2.new(1, -16, 0, 40)
+    btn.Position = UDim2.new(0, 8, 0, 10 + (order * 46))
+    btn.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+    btn.BorderSizePixel = 0
+    btn.AutoButtonColor = false
+    btn.Text = ""
+    btn.Parent = sidebar
+    
+    local btnCorner = Instance.new("UICorner")
+    btnCorner.CornerRadius = UDim.new(0, 8)
+    btnCorner.Parent = btn
+    
+    local iconLabel = Instance.new("TextLabel")
+    iconLabel.Size = UDim2.new(0, 24, 0, 24)
+    iconLabel.Position = UDim2.new(0, 10, 0.5, -12)
+    iconLabel.BackgroundTransparency = 1
+    iconLabel.Text = icon
+    iconLabel.TextSize = 16
+    iconLabel.Font = Enum.Font.GothamBold
+    iconLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+    iconLabel.Parent = btn
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, -44, 1, 0)
+    textLabel.Position = UDim2.new(0, 38, 0, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = name
+    textLabel.TextSize = 12
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+    textLabel.TextXAlignment = Enum.TextXAlignment.Left
+    textLabel.Parent = btn
+    
+    tabButtons[name] = {button = btn, icon = iconLabel, text = textLabel}
+    
+    if name == "Main" then
+        btn.BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+        iconLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+        textLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+    end
+    
+    btn.MouseEnter:Connect(function()
+        if currentTab ~= name then
+            TweenService:Create(btn, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+            }):Play()
+        end
+    end)
+    
+    btn.MouseLeave:Connect(function()
+        if currentTab ~= name then
+            TweenService:Create(btn, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+            }):Play()
+        end
+    end)
+    
+    return btn
+end
+
+local mainTabBtn = createTabButton("Main", "⚡", 0)
+
+-- ===== CONTENT AREA =====
+local contentArea = Instance.new("Frame")
+contentArea.Name = "ContentArea"
+contentArea.Size = UDim2.new(1, -156, 1, -56)
+contentArea.Position = UDim2.new(0, 148, 0, 48)
+contentArea.BackgroundTransparency = 1
+contentArea.Parent = mainFrame
+
+local contentFrame = Instance.new("Frame")
+contentFrame.Name = "MainContent"
+contentFrame.Size = UDim2.new(1, 0, 1, 0)
+contentFrame.BackgroundTransparency = 1
+contentFrame.Visible = true
+contentFrame.Parent = contentArea
+
+-- ===== MODE DROPDOWN (IMPROVED) =====
+local modeLabel = Instance.new("TextLabel")
+modeLabel.Size = UDim2.new(1, 0, 0, 16)
+modeLabel.Position = UDim2.new(0, 0, 0, 0)
+modeLabel.BackgroundTransparency = 1
+modeLabel.Text = "BOTTING MODE"
+modeLabel.TextSize = 10
+modeLabel.Font = Enum.Font.GothamBold
+modeLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+modeLabel.TextXAlignment = Enum.TextXAlignment.Left
+modeLabel.Parent = contentFrame
+
+local dropdownContainer = Instance.new("Frame")
+dropdownContainer.Size = UDim2.new(1, 0, 0, 42)
+dropdownContainer.Position = UDim2.new(0, 0, 0, 20)
+dropdownContainer.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+dropdownContainer.BorderSizePixel = 0
+dropdownContainer.ClipsDescendants = false
+dropdownContainer.ZIndex = 10
+dropdownContainer.Parent = contentFrame
+
+local dropdownCorner = Instance.new("UICorner")
+dropdownCorner.CornerRadius = UDim.new(0, 8)
+dropdownCorner.Parent = dropdownContainer
+
+local dropdownStroke = Instance.new("UIStroke")
+dropdownStroke.Color = Color3.fromRGB(50, 50, 70)
+dropdownStroke.Thickness = 1.5
+dropdownStroke.Transparency = 0
+dropdownStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+dropdownStroke.Parent = dropdownContainer
+
+local dropdownButton = Instance.new("TextButton")
+dropdownButton.Size = UDim2.new(1, 0, 1, 0)
+dropdownButton.BackgroundTransparency = 1
+dropdownButton.Text = ""
+dropdownButton.AutoButtonColor = false
+dropdownButton.ZIndex = 11
+dropdownButton.Parent = dropdownContainer
+
+local dropdownText = Instance.new("TextLabel")
+dropdownText.Size = UDim2.new(1, -50, 1, 0)
+dropdownText.Position = UDim2.new(0, 12, 0, 0)
+dropdownText.BackgroundTransparency = 1
+dropdownText.Text = modeOptions[selectedModeIndex].name
+dropdownText.TextSize = 14
+dropdownText.Font = Enum.Font.GothamBold
+dropdownText.TextColor3 = Color3.fromRGB(255, 255, 255)
+dropdownText.TextXAlignment = Enum.TextXAlignment.Left
+dropdownText.ZIndex = 11
+dropdownText.Parent = dropdownButton
+
+local dropdownArrow = Instance.new("TextLabel")
+dropdownArrow.Size = UDim2.new(0, 24, 1, 0)
+dropdownArrow.Position = UDim2.new(1, -34, 0, 0)
+dropdownArrow.BackgroundTransparency = 1
+dropdownArrow.Text = "▼"
+dropdownArrow.TextSize = 12
+dropdownArrow.Font = Enum.Font.GothamBold
+dropdownArrow.TextColor3 = Color3.fromRGB(100, 255, 180)
+dropdownArrow.ZIndex = 11
+dropdownArrow.Parent = dropdownButton
+
+local dropdownList = Instance.new("ScrollingFrame")
+dropdownList.Size = UDim2.new(1, 0, 0, 0)
+dropdownList.Position = UDim2.new(0, 0, 1, 6)
+dropdownList.BackgroundColor3 = Color3.fromRGB(22, 22, 35)
+dropdownList.BorderSizePixel = 0
+dropdownList.ScrollBarThickness = 5
+dropdownList.ScrollBarImageColor3 = Color3.fromRGB(100, 255, 180)
+dropdownList.Visible = false
+dropdownList.ClipsDescendants = true
+dropdownList.ZIndex = 15
+dropdownList.Parent = dropdownContainer
+
+local listCorner = Instance.new("UICorner")
+listCorner.CornerRadius = UDim.new(0, 8)
+listCorner.Parent = dropdownList
+
+local listStroke = Instance.new("UIStroke")
+listStroke.Color = Color3.fromRGB(100, 255, 180)
+listStroke.Thickness = 2
+listStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+listStroke.Parent = dropdownList
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Padding = UDim.new(0, 3)
+listLayout.Parent = dropdownList
+
+local listPadding = Instance.new("UIPadding")
+listPadding.PaddingTop = UDim.new(0, 6)
+listPadding.PaddingBottom = UDim.new(0, 6)
+listPadding.PaddingLeft = UDim.new(0, 6)
+listPadding.PaddingRight = UDim.new(0, 6)
+listPadding.Parent = dropdownList
+
+for i, mode in ipairs(modeOptions) do
+    local optionButton = Instance.new("TextButton")
+    optionButton.Name = mode.value
+    optionButton.Size = UDim2.new(1, -12, 0, 38)
+    optionButton.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+    optionButton.BorderSizePixel = 0
+    optionButton.Text = ""
+    optionButton.AutoButtonColor = false
+    optionButton.ZIndex = 16
+    optionButton.LayoutOrder = i
+    optionButton.Parent = dropdownList
+    
+    local optionCorner = Instance.new("UICorner")
+    optionCorner.CornerRadius = UDim.new(0, 6)
+    optionCorner.Parent = optionButton
+    
+    local optionText = Instance.new("TextLabel")
+    optionText.Size = UDim2.new(1, -20, 1, 0)
+    optionText.Position = UDim2.new(0, 10, 0, 0)
+    optionText.BackgroundTransparency = 1
+    optionText.Text = mode.name
+    optionText.TextSize = 13
+    optionText.Font = Enum.Font.GothamBold
+    optionText.TextColor3 = Color3.fromRGB(200, 200, 220)
+    optionText.TextXAlignment = Enum.TextXAlignment.Left
+    optionText.ZIndex = 17
+    optionText.Parent = optionButton
+    
+    if selectedModeIndex == i then
+        optionButton.BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        optionText.TextColor3 = Color3.fromRGB(100, 255, 180)
+    end
+    
+    optionButton.MouseEnter:Connect(function()
+        TweenService:Create(optionButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(35, 35, 50)
+        }):Play()
+        if selectedModeIndex ~= i then
+            TweenService:Create(optionText, TweenInfo.new(0.2), {
+                TextColor3 = Color3.fromRGB(255, 255, 255)
+            }):Play()
+        end
+    end)
+    
+    optionButton.MouseLeave:Connect(function()
+        if selectedModeIndex ~= i then
+            TweenService:Create(optionButton, TweenInfo.new(0.2), {
+                BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+            }):Play()
+            TweenService:Create(optionText, TweenInfo.new(0.2), {
+                TextColor3 = Color3.fromRGB(200, 200, 220)
+            }):Play()
+        end
+    end)
+    
+    optionButton.MouseButton1Click:Connect(function()
+        selectedModeIndex = i
+        dropdownText.Text = mode.name
+        
+        savedSettings.selectedMode = mode.value
+        saveSettings(savedSettings)
+        
+        for _, btn in ipairs(dropdownList:GetChildren()) do
+            if btn:IsA("TextButton") then
+                TweenService:Create(btn, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+                }):Play()
+                local txt = btn:FindFirstChildOfClass("TextLabel")
+                if txt then
+                    TweenService:Create(txt, TweenInfo.new(0.2), {
+                        TextColor3 = Color3.fromRGB(200, 200, 220)
+                    }):Play()
+                end
+            end
+        end
+        
+        TweenService:Create(optionButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(40, 40, 60)
+        }):Play()
+        TweenService:Create(optionText, TweenInfo.new(0.2), {
+            TextColor3 = Color3.fromRGB(100, 255, 180)
+        }):Play()
+        
+        usernameBox.PlaceholderText = mode.placeholder
+        usernameBox.Text = ""
+        
+        TweenService:Create(dropdownList, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+            Size = UDim2.new(1, 0, 0, 0)
+        }):Play()
+        
+        task.wait(0.3)
+        dropdownList.Visible = false
+        dropdownArrow.Text = "▼"
+    end)
+end
+
+listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    dropdownList.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 12)
+end)
+
+local dropdownOpen = false
+dropdownButton.MouseButton1Click:Connect(function()
+    dropdownOpen = not dropdownOpen
+    
+    if dropdownOpen then
+        dropdownList.Visible = true
+        dropdownList.Size = UDim2.new(1, 0, 0, 0)
+        
+        local targetHeight = math.min(#modeOptions * 41 + 18, 200)
+        
+        TweenService:Create(dropdownList, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+            Size = UDim2.new(1, 0, 0, targetHeight)
+        }):Play()
+        
+        TweenService:Create(dropdownStroke, TweenInfo.new(0.3), {
+            Color = Color3.fromRGB(100, 255, 180),
+            Thickness = 2
+        }):Play()
+        
+        dropdownArrow.Text = "▲"
+    else
+        TweenService:Create(dropdownList, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+            Size = UDim2.new(1, 0, 0, 0)
+        }):Play()
+        
+        TweenService:Create(dropdownStroke, TweenInfo.new(0.3), {
+            Color = Color3.fromRGB(50, 50, 70),
+            Thickness = 1.5
+        }):Play()
+        
+        task.wait(0.3)
+        dropdownList.Visible = false
+        dropdownArrow.Text = "▼"
+    end
+end)
+
+-- ===== INPUT SECTION =====
+local sectionLabel = Instance.new("TextLabel")
+sectionLabel.Size = UDim2.new(1, 0, 0, 16)
+sectionLabel.Position = UDim2.new(0, 0, 0, 72)
+sectionLabel.BackgroundTransparency = 1
+sectionLabel.Text = "TARGET INPUT"
+sectionLabel.TextSize = 10
+sectionLabel.Font = Enum.Font.GothamBold
+sectionLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+sectionLabel.TextXAlignment = Enum.TextXAlignment.Left
+sectionLabel.Parent = contentFrame
+
+local inputContainer = Instance.new("Frame")
+inputContainer.Size = UDim2.new(1, 0, 0, 42)
+inputContainer.Position = UDim2.new(0, 0, 0, 92)
+inputContainer.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+inputContainer.BorderSizePixel = 0
+inputContainer.Parent = contentFrame
+
+local inputCorner = Instance.new("UICorner")
+inputCorner.CornerRadius = UDim.new(0, 8)
+inputCorner.Parent = inputContainer
+
+local inputStroke = Instance.new("UIStroke")
+inputStroke.Color = Color3.fromRGB(50, 50, 70)
+inputStroke.Thickness = 1.5
+inputStroke.Transparency = 0
+inputStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+inputStroke.Parent = inputContainer
+
+local usernameBox = Instance.new("TextBox")
+usernameBox.Size = UDim2.new(1, -24, 1, 0)
+usernameBox.Position = UDim2.new(0, 12, 0, 0)
+usernameBox.BackgroundTransparency = 1
+usernameBox.PlaceholderText = modeOptions[selectedModeIndex].placeholder
+usernameBox.PlaceholderColor3 = Color3.fromRGB(100, 100, 130)
+usernameBox.Text = savedSettings.lastUsername or ""
+usernameBox.TextSize = 14
+usernameBox.Font = Enum.Font.GothamMedium
+usernameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+usernameBox.TextXAlignment = Enum.TextXAlignment.Left
+usernameBox.ClearTextOnFocus = false
+usernameBox.Parent = inputContainer
+
+usernameBox:GetPropertyChangedSignal("Text"):Connect(function()
+    savedSettings.lastUsername = usernameBox.Text
+    saveSettings(savedSettings)
+end)
+
+usernameBox.Focused:Connect(function()
+    TweenService:Create(inputStroke, TweenInfo.new(0.3), {
+        Color = Color3.fromRGB(100, 255, 180),
+        Thickness = 2
+    }):Play()
+    TweenService:Create(inputContainer, TweenInfo.new(0.3), {
+        BackgroundColor3 = Color3.fromRGB(28, 28, 42)
+    }):Play()
+end)
+
+usernameBox.FocusLost:Connect(function()
+    TweenService:Create(inputStroke, TweenInfo.new(0.3), {
+        Color = Color3.fromRGB(50, 50, 70),
+        Thickness = 1.5
+    }):Play()
+    TweenService:Create(inputContainer, TweenInfo.new(0.3), {
+        BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+    }):Play()
+end)
+
+local statusLabel = Instance.new("TextLabel")
+statusLabel.Size = UDim2.new(1, 0, 0, 18)
+statusLabel.Position = UDim2.new(0, 0, 0, 138)
+statusLabel.BackgroundTransparency = 1
+statusLabel.Text = ""
+statusLabel.TextSize = 10
+statusLabel.Font = Enum.Font.GothamMedium
+statusLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+statusLabel.TextXAlignment = Enum.TextXAlignment.Left
+statusLabel.TextWrapped = true
+statusLabel.Parent = contentFrame
+
+-- ===== ANTI REJOIN TOGGLE =====
+local antiRejoinEnabled = savedSettings.antiRejoinEnabled or false
+
+local antiToggleFrame = Instance.new("Frame")
+antiToggleFrame.Size = UDim2.new(1, 0, 0, 42)
+antiToggleFrame.Position = UDim2.new(0, 0, 0, 164)
+antiToggleFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+antiToggleFrame.BorderSizePixel = 0
+antiToggleFrame.Parent = contentFrame
+
+local antiCorner = Instance.new("UICorner")
+antiCorner.CornerRadius = UDim.new(0, 8)
+antiCorner.Parent = antiToggleFrame
+
+local antiStroke = Instance.new("UIStroke")
+antiStroke.Color = Color3.fromRGB(50, 50, 70)
+antiStroke.Thickness = 1.5
+antiStroke.Transparency = 0
+antiStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+antiStroke.Parent = antiToggleFrame
+
+local antiLabel = Instance.new("TextLabel")
+antiLabel.Size = UDim2.new(1, -65, 1, 0)
+antiLabel.Position = UDim2.new(0, 12, 0, 0)
+antiLabel.BackgroundTransparency = 1
+antiLabel.Text = "Anti Rejoin & Idle"
+antiLabel.TextSize = 12
+antiLabel.Font = Enum.Font.GothamBold
+antiLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+antiLabel.TextXAlignment = Enum.TextXAlignment.Left
+antiLabel.Parent = antiToggleFrame
+
+local toggleButton = Instance.new("TextButton")
+toggleButton.Size = UDim2.new(0, 46, 0, 24)
+toggleButton.Position = UDim2.new(1, -56, 0.5, -12)
+toggleButton.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+toggleButton.Text = ""
+toggleButton.BorderSizePixel = 0
+toggleButton.AutoButtonColor = false
+toggleButton.Parent = antiToggleFrame
+
+local toggleCorner = Instance.new("UICorner")
+toggleCorner.CornerRadius = UDim.new(1, 0)
+toggleCorner.Parent = toggleButton
+
+local toggleCircle = Instance.new("Frame")
+toggleCircle.Size = UDim2.new(0, 18, 0, 18)
+toggleCircle.Position = UDim2.new(0, 3, 0.5, -9)
+toggleCircle.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+toggleCircle.BorderSizePixel = 0
+toggleCircle.Parent = toggleButton
+
+local circleCorner = Instance.new("UICorner")
+circleCorner.CornerRadius = UDim.new(1, 0)
+circleCorner.Parent = toggleCircle
+
+if antiRejoinEnabled then
+    toggleButton.BackgroundColor3 = Color3.fromRGB(100, 255, 180)
+    toggleCircle.Position = UDim2.new(1, -21, 0.5, -9)
+    antiStroke.Color = Color3.fromRGB(100, 255, 180)
+    antiLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+    
+    task.spawn(function()
+        pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/carterx2008/Script/main/AntiRejoin", true))()
+        end)
+    end)
+end
+
+toggleButton.MouseButton1Click:Connect(function()
+    antiRejoinEnabled = not antiRejoinEnabled
+    
+    savedSettings.antiRejoinEnabled = antiRejoinEnabled
+    saveSettings(savedSettings)
+    
+    if antiRejoinEnabled then
+        TweenService:Create(toggleButton, TweenInfo.new(0.3), {
+            BackgroundColor3 = Color3.fromRGB(100, 255, 180)
+        }):Play()
+        TweenService:Create(toggleCircle, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+            Position = UDim2.new(1, -21, 0.5, -9)
+        }):Play()
+        TweenService:Create(antiStroke, TweenInfo.new(0.3), {
+            Color = Color3.fromRGB(100, 255, 180),
+            Thickness = 2
+        }):Play()
+        
+        local success = pcall(function()
+            loadstring(game:HttpGet("https://raw.githubusercontent.com/carterx2008/Script/main/AntiRejoin", true))()
+        end)
+        
+        if success then
+            antiLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+            
+            task.spawn(function()
+                for i = 1, 2 do
+                    TweenService:Create(antiToggleFrame, TweenInfo.new(0.2), {
+                        BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+                    }):Play()
+                    task.wait(0.2)
+                    TweenService:Create(antiToggleFrame, TweenInfo.new(0.2), {
+                        BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+                    }):Play()
+                    task.wait(0.2)
+                end
+            end)
+        end
+    else
+        TweenService:Create(toggleButton, TweenInfo.new(0.3), {
+            BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        }):Play()
+        TweenService:Create(toggleCircle, TweenInfo.new(0.3, Enum.EasingStyle.Back), {
+            Position = UDim2.new(0, 3, 0.5, -9)
+        }):Play()
+        TweenService:Create(antiStroke, TweenInfo.new(0.3), {
+            Color = Color3.fromRGB(50, 50, 70),
+            Thickness = 1.5
+        }):Play()
+        antiLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    end
+end)
+
+toggleButton.MouseEnter:Connect(function()
+    if not antiRejoinEnabled then
+        TweenService:Create(toggleButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(70, 70, 90)
+        }):Play()
+    end
+end)
+
+toggleButton.MouseLeave:Connect(function()
+    if not antiRejoinEnabled then
+        TweenService:Create(toggleButton, TweenInfo.new(0.2), {
+            BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+        }):Play()
+    end
+end)
+
+-- ===== ACTIVATE BUTTON =====
+local activateButton = Instance.new("TextButton")
+activateButton.Size = UDim2.new(1, 0, 0, 44)
+activateButton.Position = UDim2.new(0, 0, 1, -44)
+activateButton.BackgroundColor3 = Color3.fromRGB(100, 255, 180)
+activateButton.Text = ""
+activateButton.BorderSizePixel = 0
+activateButton.AutoButtonColor = false
+activateButton.Parent = contentFrame
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = activateButton
+
+local btnGradient = Instance.new("UIGradient")
+btnGradient.Color = ColorSequence.new{
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(100, 255, 180)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 200, 255))
+}
+btnGradient.Rotation = 45
+btnGradient.Parent = activateButton
+
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color = Color3.fromRGB(100, 255, 180)
+btnStroke.Thickness = 0
+btnStroke.Transparency = 0.5
+btnStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+btnStroke.Parent = activateButton
+
+local btnLabel = Instance.new("TextLabel")
+btnLabel.Size = UDim2.new(1, 0, 1, 0)
+btnLabel.BackgroundTransparency = 1
+btnLabel.Text = "ACTIVATE"
+btnLabel.TextSize = 14
+btnLabel.Font = Enum.Font.GothamBold
+btnLabel.TextColor3 = Color3.fromRGB(18, 18, 28)
+btnLabel.Parent = activateButton
+
+activateButton.MouseEnter:Connect(function()
+    TweenService:Create(activateButton, TweenInfo.new(0.2), {
+        Size = UDim2.new(1, 0, 0, 46)
+    }):Play()
+    TweenService:Create(btnStroke, TweenInfo.new(0.2), {
+        Thickness = 2,
+        Transparency = 0
+    }):Play()
+end)
+
+activateButton.MouseLeave:Connect(function()
+    TweenService:Create(activateButton, TweenInfo.new(0.2), {
+        Size = UDim2.new(1, 0, 0, 44)
+    }):Play()
+    TweenService:Create(btnStroke, TweenInfo.new(0.2), {
+        Thickness = 0,
+        Transparency = 0.5
+    }):Play()
+end)
+
+-- ===== VALIDATION FUNCTIONS =====
+local function isValidUsername(input)
+    if #input < 3 or #input > 20 then
+        return false
+    end
+    if input:match("^%d") then
+        return false
+    end
+    return input:match("^[%w_]+$") ~= nil
+end
+
+local function isValidUserId(input)
+    return input:match("^%d+$") ~= nil and tonumber(input) > 0
+end
+
+local function shakeAnimation(frame)
+    local originalPos = frame.Position
+    for i = 1, 3 do
+        TweenService:Create(frame, TweenInfo.new(0.05), {
+            Position = originalPos + UDim2.new(0, 5, 0, 0)
+        }):Play()
+        task.wait(0.05)
+        TweenService:Create(frame, TweenInfo.new(0.05), {
+            Position = originalPos + UDim2.new(0, -5, 0, 0)
+        }):Play()
+        task.wait(0.05)
+    end
+    TweenService:Create(frame, TweenInfo.new(0.05), {
+        Position = originalPos
+    }):Play()
+end
+
+-- ===== ACTIVATE BUTTON FUNCTION =====
+activateButton.MouseButton1Click:Connect(function()
+    local input = usernameBox.Text:gsub("^%s*(.-)%s*$", "%1")
+    local currentMode = modeOptions[selectedModeIndex]
+    
+    TweenService:Create(activateButton, TweenInfo.new(0.1), {
+        Size = UDim2.new(0.98, 0, 0, 42)
+    }):Play()
+    task.wait(0.1)
+    TweenService:Create(activateButton, TweenInfo.new(0.1), {
+        Size = UDim2.new(1, 0, 0, 44)
+    }):Play()
+    
+    if input == "" then
+        statusLabel.Text = "Error: Please enter required input"
+        statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+        shakeAnimation(inputContainer)
+        return
+    end
+    
+    if currentMode.requireName then
+        local isUsername = isValidUsername(input)
+        local isUserId = isValidUserId(input)
+        
+        if not isUsername and not isUserId then
+            statusLabel.Text = "Error: Invalid username or ID format"
+            statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+            shakeAnimation(inputContainer)
+            return
+        end
+        
+        statusLabel.Text = "Validating user..."
+        statusLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+        btnLabel.Text = "PROCESSING..."
+        
+        local userId
+        
+        if isUserId then
+            userId = tonumber(input)
+            statusLabel.Text = "Checking User ID: " .. userId
+            
+            local success, result = pcall(function()
+                return Players:GetNameFromUserIdAsync(userId)
+            end)
+            
+            if not success or not result then
+                statusLabel.Text = "Error: User ID does not exist"
+                statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+                btnLabel.Text = "ACTIVATE"
+                shakeAnimation(inputContainer)
+                return
+            end
+            
+            statusLabel.Text = "Found: " .. result
+            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+        else
+            statusLabel.Text = "Fetching User ID..."
+            
+            local success1, result = pcall(function()
+                local args = {input}
+                return ReplicatedStorage:WaitForChild("GetUserIdFromUsername"):InvokeServer(unpack(args))
+            end)
+            
+            if not success1 or not result or result == 0 then
+                statusLabel.Text = "Error: Username not found"
+                statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+                btnLabel.Text = "ACTIVATE"
+                shakeAnimation(inputContainer)
+                return
+            end
+            
+            userId = result
+            statusLabel.Text = "User ID: " .. tostring(userId)
+            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+        end
+        
+        task.wait(0.3)
+        
+        statusLabel.Text = "Activating " .. currentMode.name .. "..."
+        
+        local success2 = pcall(function()
+            local args = {currentMode.value, userId}
+            ReplicatedStorage:WaitForChild("SetBottingMode"):FireServer(unpack(args))
+        end)
+        
+        if success2 then
+            statusLabel.Text = "✓ " .. currentMode.name .. " activated"
+            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+            btnLabel.Text = "COMPLETED"
+            
+            savedSettings.autoActivate = true
+            savedSettings.lastUsername = input
+            savedSettings.lastModeID = tostring(userId)
+            saveSettings(savedSettings)
+            
+            for i = 1, 2 do
+                TweenService:Create(activateButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Color3.fromRGB(150, 255, 220)
+                }):Play()
+                task.wait(0.2)
+                TweenService:Create(activateButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Color3.fromRGB(100, 255, 180)
+                }):Play()
+                task.wait(0.2)
+            end
+            
+            task.wait(1)
+            btnLabel.Text = "ACTIVATE"
+        else
+            statusLabel.Text = "Error: Server failed"
+            statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+            btnLabel.Text = "ACTIVATE"
+        end
+    else
+        if not isValidUserId(input) then
+            statusLabel.Text = "Error: Must be a valid numeric ID"
+            statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+            shakeAnimation(inputContainer)
+            return
+        end
+        
+        local targetId = tonumber(input)
+        
+        statusLabel.Text = "Activating " .. currentMode.name .. "..."
+        statusLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+        btnLabel.Text = "PROCESSING..."
+        
+        task.wait(0.3)
+        
+        local success = pcall(function()
+            local args = {currentMode.value, targetId}
+            ReplicatedStorage:WaitForChild("SetBottingMode"):FireServer(unpack(args))
+        end)
+        
+        if success then
+            statusLabel.Text = "✓ " .. currentMode.name .. " activated"
+            statusLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+            btnLabel.Text = "COMPLETED"
+            
+            savedSettings.autoActivate = true
+            savedSettings.lastUsername = input
+            savedSettings.lastModeID = input
+            saveSettings(savedSettings)
+            
+            for i = 1, 2 do
+                TweenService:Create(activateButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Color3.fromRGB(150, 255, 220)
+                }):Play()
+                task.wait(0.2)
+                TweenService:Create(activateButton, TweenInfo.new(0.2), {
+                    BackgroundColor3 = Color3.fromRGB(100, 255, 180)
+                }):Play()
+                task.wait(0.2)
+            end
+            
+            task.wait(1)
+            btnLabel.Text = "ACTIVATE"
+        else
+            statusLabel.Text = "Error: Server failed"
+            statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+            btnLabel.Text = "ACTIVATE"
+        end
+    end
+end)
+
+-- ===== DRAGGABLE SYSTEM =====
+local dragging = false
+local dragInput
+local dragStart
+local startPos
+
+local function update(input)
+    local delta = input.Position - dragStart
+    mainFrame.Position = UDim2.new(
+        startPos.X.Scale,
+        startPos.X.Offset + delta.X,
+        startPos.Y.Scale,
+        startPos.Y.Offset + delta.Y
+    )
+end
+
+headerFrame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = mainFrame.Position
+        
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+headerFrame.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        update(input)
+    end
+end)
+
+-- ===== ENTRANCE ANIMATION =====
+mainFrame.Size = UDim2.new(0, 0, 0, 0)
+mainFrame.BackgroundTransparency = 1
+borderStroke.Transparency = 1
+
+local entranceAnim = TweenService:Create(mainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+    Size = UDim2.new(0, 550, 0, 380),
+    BackgroundTransparency = 0.05
+})
+
+local borderAnim = TweenService:Create(borderStroke, TweenInfo.new(0.5), {
+    Transparency = 0
+})
+
+entranceAnim:Play()
+borderAnim:Play()
+
+-- ===== AUTO-ACTIVATE SYSTEM =====
+task.spawn(function()
+    task.wait(1)
+    
+    if savedSettings.autoActivate and savedSettings.lastUsername and savedSettings.lastUsername ~= "" then
+        statusLabel.Text = "Auto-activating saved configuration..."
+        statusLabel.TextColor3 = Color3.fromRGB(100, 200, 255)
+        
+        task.wait(0.5)
+        
+        local input = savedSettings.lastUsername
+        local currentMode = modeOptions[selectedModeIndex]
+        
+        if currentMode.requireName then
+            local isUsername = isValidUsername(input)
+            local isUserId = isValidUserId(input)
+            
+            if isUsername or isUserId then
+                local userId
+                
+                if isUserId then
+                    userId = tonumber(input)
+                    local success, result = pcall(function()
+                        return Players:GetNameFromUserIdAsync(userId)
+                    end)
+                    
+                    if success and result then
+                        statusLabel.Text = "Auto: " .. result
+                        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+                    else
+                        statusLabel.Text = "Auto-activation failed"
+                        statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+                        return
+                    end
+                else
+                    local success1, result = pcall(function()
+                        local args = {input}
+                        return ReplicatedStorage:WaitForChild("GetUserIdFromUsername"):InvokeServer(unpack(args))
+                    end)
+                    
+                    if success1 and result and result ~= 0 then
+                        userId = result
+                        statusLabel.Text = "Auto: User ID " .. userId
+                        statusLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+                    else
+                        statusLabel.Text = "Auto-activation failed"
+                        statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+                        return
+                    end
+                end
+                
+                task.wait(0.3)
+                
+                local success2 = pcall(function()
+                    local args = {currentMode.value, userId}
+                    ReplicatedStorage:WaitForChild("SetBottingMode"):FireServer(unpack(args))
+                end)
+                
+                if success2 then
+                    statusLabel.Text = "✓ Auto-activated successfully"
+                    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+                    
+                    for i = 1, 2 do
+                        TweenService:Create(inputContainer, TweenInfo.new(0.2), {
+                            BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+                        }):Play()
+                        task.wait(0.2)
+                        TweenService:Create(inputContainer, TweenInfo.new(0.2), {
+                            BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+                        }):Play()
+                        task.wait(0.2)
+                    end
+                else
+                    statusLabel.Text = "Auto-activation: Server failed"
+                    statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+                end
+            else
+                statusLabel.Text = "Auto-activation: Invalid saved data"
+                statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+                end
+            else
+            if isValidUserId(input) then
+                local targetId = tonumber(input)
+                
+                local success = pcall(function()
+                    local args = {currentMode.value, targetId}
+                    ReplicatedStorage:WaitForChild("SetBottingMode"):FireServer(unpack(args))
+                end)
+                
+                if success then
+                    statusLabel.Text = "✓ Auto-activated: " .. currentMode.name
+                    statusLabel.TextColor3 = Color3.fromRGB(100, 255, 180)
+                    
+                    for i = 1, 2 do
+                        TweenService:Create(inputContainer, TweenInfo.new(0.2), {
+                            BackgroundColor3 = Color3.fromRGB(30, 30, 45)
+                        }):Play()
+                        task.wait(0.2)
+                        TweenService:Create(inputContainer, TweenInfo.new(0.2), {
+                            BackgroundColor3 = Color3.fromRGB(25, 25, 38)
+                        }):Play()
+                        task.wait(0.2)
+                    end
+                else
+                    statusLabel.Text = "Auto-activation: Server failed"
+                    statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+                end
+            else
+                statusLabel.Text = "Auto-activation: Invalid ID format"
+                statusLabel.TextColor3 = Color3.fromRGB(255, 120, 120)
+            end
+        end
+    end
+end)
