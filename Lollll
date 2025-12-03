@@ -1,7 +1,6 @@
-
 local P = game:GetService("Players")
 local LP = P.LocalPlayer
-local SPAWN_POSITION = Vector3.new(-43, 6, 111)
+local SPAWN_POSITION = Vector3.new(-69, 6, 120)
 
 local function DestroySword(container)
     for _, V in ipairs(container:GetChildren()) do 
